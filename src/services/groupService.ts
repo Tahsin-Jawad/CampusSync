@@ -1,59 +1,12 @@
-import { collection, doc, setDoc, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from './firebase';
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
 
-function timeToMinutes(timeStr: string): number {
-  if (!timeStr) return 0;
-  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-  if (!match) return 0;
-
-  let [, hoursStr, minutesStr, modifier] = match;
-  let hours = parseInt(hoursStr, 10);
-  const minutes = parseInt(minutesStr, 10);
-
-  if (modifier) {
-    modifier = modifier.toUpperCase();
-    if (modifier === 'PM' && hours < 12) hours += 12;
-    if (modifier === 'AM' && hours === 12) hours = 0;
-  }
-
-  return hours * 60 + minutes;
-}
-
-export const calculateLiveStatus = (
-  user: UserProfile,
-  slots: CourseSlot[],
-  currentDay: CourseSlot['day'],
-  currentTimeInMinutes: number
-): FriendLiveStatus => {
-  const daySlots = slots.filter((s) => s.day === currentDay);
-
-  const currentClass = daySlots.find((s) => {
-    const start = timeToMinutes(s.startTime);
-    const end = timeToMinutes(s.endTime);
-    return currentTimeInMinutes >= start && currentTimeInMinutes <= end;
-  });
-
-  const isCurrentlyFree = !currentClass;
-
-  const nextClass = daySlots
-    .filter((s) => timeToMinutes(s.startTime) > currentTimeInMinutes)
-    .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))[0];
-
-  return {
-    user,
-    slots,
-    isCurrentlyFree,
-    currentClass,
-    nextClass,
-  };
-};
-
-export const createGroup = async (groupName: string, creatorId: string) => {
+export const createGroup = async (name: string, creatorId: string): Promise<Group> => {
   const groupRef = doc(collection(db, 'groups'));
   const newGroup: Group = {
     id: groupRef.id,
-    name: groupName,
+    name,
     createdById: creatorId,
     members: [creatorId],
   };
@@ -62,9 +15,9 @@ export const createGroup = async (groupName: string, creatorId: string) => {
 };
 
 export const getUserGroups = async (userId: string): Promise<Group[]> => {
-  const querySnap = await getDocs(collection(db, 'groups'));
+  const querySnapshot = await getDocs(collection(db, 'groups'));
   const groups: Group[] = [];
-  querySnap.forEach((docSnap) => {
+  querySnapshot.forEach((docSnap) => {
     const data = docSnap.data() as Group;
     if (data.members && data.members.includes(userId)) {
       groups.push(data);
@@ -78,4 +31,57 @@ export const joinGroup = async (groupId: string, userId: string) => {
   await updateDoc(groupRef, {
     members: arrayUnion(userId),
   });
+};
+
+export const removeGroupMember = async (groupId: string, userIdToRemove: string) => {
+  const groupRef = doc(db, 'groups', groupId);
+  await updateDoc(groupRef, {
+    members: arrayRemove(userIdToRemove),
+  });
+};
+
+export const calculateLiveStatus = (
+  user: UserProfile,
+  slots: CourseSlot[],
+  dayName: CourseSlot['day'],
+  currentMinutes: number
+): FriendLiveStatus => {
+  const todaySlots = slots.filter((s) => s.day === dayName);
+
+  const parseToMinutes = (timeStr: string) => {
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return 0;
+    let hrs = parseInt(match[1]);
+    const mins = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hrs < 12) hrs += 12;
+    if (ampm === 'AM' && hrs === 12) hrs = 0;
+    return hrs * 60 + mins;
+  };
+
+  let currentClass: CourseSlot | undefined;
+  let nextClass: CourseSlot | undefined;
+  let minNextTime = Infinity;
+
+  todaySlots.forEach((slot) => {
+    const startMins = parseToMinutes(slot.startTime);
+    const endMins = parseToMinutes(slot.endTime);
+
+    if (currentMinutes >= startMins && currentMinutes <= endMins) {
+      currentClass = slot;
+    }
+
+    if (startMins > currentMinutes && startMins < minNextTime) {
+      minNextTime = startMins;
+      nextClass = slot;
+    }
+  });
+
+  return {
+    user,
+    slots,
+    isCurrentlyFree: !currentClass,
+    currentClass,
+    nextClass,
+  };
 };

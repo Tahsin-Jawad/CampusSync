@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Clock, UserCheck, Copy, Check } from 'lucide-react';
+import { Users, Plus, Clock, UserCheck, Copy, Check, UserX } from 'lucide-react';
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
-import { createGroup, getUserGroups, joinGroup, calculateLiveStatus } from '../services/groupService';
+import { createGroup, getUserGroups, joinGroup, calculateLiveStatus, removeGroupMember } from '../services/groupService';
 import { getAllFriendsRoutines } from '../services/userService';
 
 interface GroupManagerModalProps {
@@ -59,9 +59,27 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
     setJoinGroupId('');
   };
 
+  const handleRemoveMember = async (memberId: string) => {
+    if (selectedGroupId === 'ALL' || !currentGroup) return;
+    const confirmMsg = memberId === currentUser.id 
+      ? 'Are you sure you want to leave this group?' 
+      : 'Are you sure you want to remove this member?';
+    
+    if (window.confirm(confirmMsg)) {
+      await removeGroupMember(selectedGroupId, memberId);
+      await loadData();
+    }
+  };
+
   if (!isOpen) return null;
 
   const currentGroup = groups.find((g) => g.id === selectedGroupId);
+
+  // Permission Logic: Super Admin or Group Creator can manage members
+  const ADMIN_EMAIL = 'jawadtahsinal@gmail.com';
+  const isAdmin = currentUser.email === ADMIN_EMAIL;
+  const isCreator = currentGroup?.createdById === currentUser.id;
+  const canManageMembers = isAdmin || isCreator;
 
   const filteredFriends = friendsData.filter((f) => {
     if (selectedGroupId === 'ALL') return true;
@@ -203,15 +221,28 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
                     </div>
                   </div>
 
-                  <div className="text-right opacity-80">
-                    {st.nextClass ? (
-                      <div>
-                        <span className="text-[10px] block opacity-60">Next Class:</span>
-                        <span className="font-semibold text-primary">{st.nextClass.courseCode}</span>
-                        <span className="block text-[10px]">{st.nextClass.startTime}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] opacity-60">No more classes today</span>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right opacity-80">
+                      {st.nextClass ? (
+                        <div>
+                          <span className="text-[10px] block opacity-60">Next Class:</span>
+                          <span className="font-semibold text-primary">{st.nextClass.courseCode}</span>
+                          <span className="block text-[10px]">{st.nextClass.startTime}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] opacity-60">No more classes today</span>
+                      )}
+                    </div>
+
+                    {/* Delete button logic: Admin, Creator, or Leaving self */}
+                    {selectedGroupId !== 'ALL' && (canManageMembers || st.user.id === currentUser.id) && (
+                      <button
+                        onClick={() => handleRemoveMember(st.user.id)}
+                        className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+                        title={st.user.id === currentUser.id ? "Leave Group" : "Remove Member"}
+                      >
+                        <UserX className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
                 </div>
