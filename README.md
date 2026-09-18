@@ -38,5 +38,5 @@ To run this project locally on your machine, follow these simple steps:
 
 ### 1. Clone the Repository
 ```bash
-git clone (https://github.com/Tahsin-Jawad/CampusSync.git)
+git clone https://github.com/Tahsin-Jawad/CampusSync.git
 cd campus-sync
