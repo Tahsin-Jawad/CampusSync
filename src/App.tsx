@@ -143,7 +143,6 @@ export default function App() {
     if (user && f.profile.id === user.id) return false;
     
     if (!campusActive) return false;
-    if (f.profile.campusStatus !== 'ON_CAMPUS') return false;
 
     const isInMyGroup = userGroupMemberIds.size === 0 || userGroupMemberIds.has(f.profile.id);
     if (!isInMyGroup) return false;
