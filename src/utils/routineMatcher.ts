@@ -6,7 +6,6 @@ export interface FreeTimeSlot {
   endTime: string;
 }
 
-// Convert "09:00 AM" to minutes from midnight
 function timeToMinutes(timeStr: string): number {
   const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
   if (!match) return 0;
@@ -24,19 +23,44 @@ function timeToMinutes(timeStr: string): number {
   return hours * 60 + minutes;
 }
 
-// Convert minutes from midnight back to "09:00 AM"
 function minutesToTime(totalMinutes: number): string {
   let hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   const modifier = hours >= 12 ? 'PM' : 'AM';
 
   hours = hours % 12;
-  hours = hours ? hours : 12; // 0 should be 12
+  hours = hours ? hours : 12;
 
   const strHours = hours < 10 ? `0${hours}` : `${hours}`;
   const strMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
 
   return `${strHours}:${strMinutes} ${modifier}`;
+}
+
+export function isWithinCampusHours(): boolean {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const campusStart = timeToMinutes('08:00 AM');
+  const campusEnd = timeToMinutes('06:00 PM');
+  return currentMinutes >= campusStart && currentMinutes <= campusEnd;
+}
+
+export function hasUserEndedAllClassesToday(slots: CourseSlot[], currentDay: CourseSlot['day']): boolean {
+  const todaySlots = slots.filter((s) => s.day === currentDay);
+  if (todaySlots.length === 0) return true;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  let latestEndMinutes = 0;
+  todaySlots.forEach((s) => {
+    const endMins = timeToMinutes(s.endTime);
+    if (endMins > latestEndMinutes) {
+      latestEndMinutes = endMins;
+    }
+  });
+
+  return currentMinutes > latestEndMinutes;
 }
 
 export function findCommonFreeTime(
@@ -62,7 +86,6 @@ export function findCommonFreeTime(
 
   const commonFreeSlots: FreeTimeSlot[] = [];
 
-  // Check intervals in 30 min steps
   for (let time = campusStart; time < campusEnd; time += 30) {
     const slotEnd = time + 30;
 

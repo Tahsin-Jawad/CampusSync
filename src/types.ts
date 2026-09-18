@@ -15,6 +15,7 @@ export interface UserProfile {
   phone?: string;
   isPublic: boolean;
   campusStatus: 'ON_CAMPUS' | 'OFF_CAMPUS' | string;
+  isAdmin?: boolean; 
 }
 
 export interface Group {

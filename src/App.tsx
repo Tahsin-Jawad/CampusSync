@@ -12,8 +12,9 @@ import { AuthModal } from './components/AuthModal';
 import { GroupManagerModal } from './components/GroupManagerModal';
 import { Footer } from './components/Footer';
 import { Navbar } from './components/Navbar';
+import { isWithinCampusHours } from './utils/routineMatcher';
 import type { UserProfile, CourseSlot, Group } from './types';
-import { Phone, Clock } from 'lucide-react';
+import { Phone, Clock, ShieldAlert } from 'lucide-react';
 
 const DAYS: CourseSlot['day'][] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -46,6 +47,7 @@ export default function App() {
             email: firebaseUser.email || '',
             campusStatus: 'ON_CAMPUS',
             isPublic: true,
+            isAdmin: firebaseUser.email === 'jawad@gmail.com'
           };
           await setDoc(userDocRef, newProfile);
           setUser(newProfile);
@@ -71,7 +73,6 @@ export default function App() {
   }, []);
 
   const handleRoutineParsed = async (newSlots: CourseSlot[]) => {
-    // Fixed: Overwrite previous slots completely instead of appending/duplicating
     setRoutineSlots(newSlots);
     if (user) {
       await saveUserRoutine(user.id, newSlots);
@@ -118,21 +119,26 @@ export default function App() {
     alert('Phone number saved successfully!');
   };
 
-  // Current time calculation for free status check
   const now = new Date();
   const dayName = DAYS[now.getDay()];
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const campusActive = isWithinCampusHours();
 
-  // Group members ID collection
   const userGroupMemberIds = new Set<string>();
   userGroups.forEach((g) => g.members.forEach((m) => userGroupMemberIds.add(m)));
 
   const freeGroupFriends = friendsData.filter((f) => {
     if (user && f.profile.id === user.id) return false;
+    
+    if (!campusActive) return false;
+
     const isInMyGroup = userGroupMemberIds.size === 0 || userGroupMemberIds.has(f.profile.id);
     if (!isInMyGroup) return false;
 
     const todaySlots = f.slots.filter((s) => s.day === dayName);
+    
+    if (todaySlots.length === 0) return false;
+
     const parseToMins = (tStr: string) => {
       const m = tStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!m) return 0;
@@ -141,6 +147,11 @@ export default function App() {
       if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
       return h * 60 + min;
     };
+
+    const latestClassEndMinutes = Math.max(...todaySlots.map(s => parseToMins(s.endTime)));
+    if (currentMinutes > latestClassEndMinutes) {
+      return false;
+    }
 
     let inClass = false;
     todaySlots.forEach((s) => {
@@ -173,10 +184,14 @@ export default function App() {
                 >
                   {user.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
                 </button>
+                {user.isAdmin && (
+                  <span className="badge badge-error text-white font-bold gap-1 text-xs">
+                    <ShieldAlert className="w-3 h-3" /> Admin View Active
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Quick Phone Number Form */}
             <form onSubmit={handleSavePhone} className="flex items-center gap-2 bg-base-100/70 backdrop-blur p-2 rounded-2xl border border-base-300">
               <input
                 type="text"
@@ -192,10 +207,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Main Grid Layout: Left Side Routine, Right Side Live Free Friends Sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left 2 Columns: Uploader & Routine Table */}
           <div className="lg:col-span-2 space-y-6">
             <RoutineUploader
               onRoutineParsed={handleRoutineParsed}
@@ -214,7 +227,6 @@ export default function App() {
             />
           </div>
 
-          {/* Right 1 Column: Permanent Live Free Friends Sidebar */}
           <div className="space-y-4">
             <div className="bg-base-200 p-5 rounded-2xl border border-base-300 shadow-sm sticky top-6">
               <h3 className="font-bold text-sm flex items-center gap-2 mb-4 text-success">
@@ -222,30 +234,40 @@ export default function App() {
                 Free in Your Groups Right Now
               </h3>
 
+              {!campusActive && (
+                <div className="mb-3 text-[11px] bg-warning/10 text-warning-content p-2 rounded-lg border border-warning/20">
+                  🌙 Off-campus hours. Free status is hidden during night/off-hours.
+                </div>
+              )}
+
               {freeGroupFriends.length > 0 ? (
                 <div className="space-y-3">
-                  {freeGroupFriends.map((f) => (
-                    <div key={f.profile.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs shadow-sm">
-                      <div>
-                        <span className="font-bold text-sm block">{f.profile.fullName}</span>
-                        <span className="text-[11px] opacity-60">
-                          {f.profile.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
-                        </span>
+                  {freeGroupFriends.map((f) => {
+                    const canSeePhone = user?.isAdmin || userGroupMemberIds.has(f.profile.id);
+
+                    return (
+                      <div key={f.profile.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs shadow-sm">
+                        <div>
+                          <span className="font-bold text-sm block">{f.profile.fullName}</span>
+                          <span className="text-[11px] opacity-60">
+                            {f.profile.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
+                          </span>
+                        </div>
+                        
+                        {canSeePhone && f.profile.phone ? (
+                          <a
+                            href={`tel:${f.profile.phone}`}
+                            className="btn btn-success btn-xs gap-1 text-white shadow"
+                            title="Call Friend"
+                          >
+                            <Phone className="w-3 h-3" /> Call
+                          </a>
+                        ) : (
+                          <span className="text-[10px] opacity-40 italic">Hidden / No phone</span>
+                        )}
                       </div>
-                      
-                      {f.profile.phone ? (
-                        <a
-                          href={`tel:${f.profile.phone}`}
-                          className="btn btn-success btn-xs gap-1 text-white shadow"
-                          title="Call Friend"
-                        >
-                          <Phone className="w-3 h-3" /> Call
-                        </a>
-                      ) : (
-                        <span className="text-[10px] opacity-40 italic">No phone</span>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 space-y-2">
