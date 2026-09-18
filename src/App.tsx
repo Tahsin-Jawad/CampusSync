@@ -200,7 +200,8 @@ export default function App() {
 
       <Footer />
 
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+     <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      
       <AddCourseModal 
         isOpen={isAddModalOpen} 
         onClose={() => {
@@ -210,12 +211,16 @@ export default function App() {
         onSaveSlot={handleSaveSlot} 
         initialData={editingSlot}
       />
-      <FriendScheduleModal 
-        isOpen={isFriendModalOpen} 
-        onClose={() => setIsFriendModalOpen(false)} 
-        userSlots={routineSlots} 
-        currentUserId={user.id}
-      />
+      
+      {user && (
+        <FriendScheduleModal 
+          isOpen={isFriendModalOpen} 
+          onClose={() => setIsFriendModalOpen(false)} 
+          userSlots={routineSlots} 
+          currentUserId={user.id}
+        />
+      )}
+
       {user && (
         <GroupManagerModal
           isOpen={isGroupModalOpen}
