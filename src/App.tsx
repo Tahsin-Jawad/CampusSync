@@ -13,7 +13,7 @@ import { GroupManagerModal } from './components/GroupManagerModal';
 import { Footer } from './components/Footer';
 import { Navbar } from './components/Navbar';
 import type { UserProfile, CourseSlot, Group } from './types';
-import { Phone, Users, Clock, Sparkles } from 'lucide-react';
+import { Phone, Clock } from 'lucide-react';
 
 const DAYS: CourseSlot['day'][] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -101,7 +101,7 @@ export default function App() {
 
   const handleStatusToggle = async () => {
     if (!user) return;
-    const newStatus = user.campusStatus === 'ON_CAMPUS' ? 'OFF_CAMPUS' : 'ON_CAMPUS';
+    const newStatus: 'ON_CAMPUS' | 'OFF_CAMPUS' = user.campusStatus === 'ON_CAMPUS' ? 'OFF_CAMPUS' : 'ON_CAMPUS';
     const updated = { ...user, campusStatus: newStatus };
     setUser(updated);
     await updateUserStatus(user.id, newStatus);
@@ -162,9 +162,9 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6 flex-grow">
         {user && (
-          <div className="bg-gradient-to-r from-primary/25 via-secondary/15 to-base-200 p-4 sm:p-6 rounded-3xl border border-primary/20 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="bg-gradient-to-r from-primary/25 via-secondary/15 to-base-200 p-6 rounded-3xl border border-primary/20 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-xl sm:text-2xl font-black">Welcome, {user.fullName}! 👋</h1>
+              <h1 className="text-2xl font-black">Welcome, {user.fullName}! 👋</h1>
               <div className="flex items-center gap-3 mt-2">
                 <span className="text-xs opacity-75">Status:</span>
                 <button 
@@ -177,26 +177,26 @@ export default function App() {
             </div>
 
             {/* Quick Phone Number Form */}
-            <form onSubmit={handleSavePhone} className="flex items-center gap-2 bg-base-100/70 backdrop-blur p-2 rounded-2xl border border-base-300 w-full sm:w-auto justify-between sm:justify-start">
+            <form onSubmit={handleSavePhone} className="flex items-center gap-2 bg-base-100/70 backdrop-blur p-2 rounded-2xl border border-base-300">
               <input
                 type="text"
-                placeholder="Add Phone (e.g. 017...)"
-                className="input input-bordered input-xs w-36 sm:w-40 text-xs"
+                placeholder="Add Phone (e.g. 017XXXXXXXX)"
+                className="input input-bordered input-xs w-40 text-xs"
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value)}
               />
-              <button type="submit" disabled={isUpdatingPhone} className="btn btn-primary btn-xs shrink-0">
+              <button type="submit" disabled={isUpdatingPhone} className="btn btn-primary btn-xs">
                 {isUpdatingPhone ? 'Saving...' : 'Save Phone'}
               </button>
             </form>
           </div>
         )}
 
-        {/* Main Grid Layout: Mobile-Optimized Order (Sidebar First on mobile for quick access) */}
+        {/* Main Grid Layout: Left Side Routine, Right Side Live Free Friends Sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left 2 Columns: Uploader & Routine Table */}
-          <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
+          <div className="lg:col-span-2 space-y-6">
             <RoutineUploader
               onRoutineParsed={handleRoutineParsed}
               onOpenManualForm={() => {
@@ -215,8 +215,8 @@ export default function App() {
           </div>
 
           {/* Right 1 Column: Permanent Live Free Friends Sidebar */}
-          <div className="space-y-4 order-1 lg:order-2">
-            <div className="bg-base-200 p-4 sm:p-5 rounded-2xl border border-base-300 shadow-sm lg:sticky lg:top-6">
+          <div className="space-y-4">
+            <div className="bg-base-200 p-5 rounded-2xl border border-base-300 shadow-sm sticky top-6">
               <h3 className="font-bold text-sm flex items-center gap-2 mb-4 text-success">
                 <span className="w-2.5 h-2.5 rounded-full bg-success animate-ping"></span>
                 Free in Your Groups Right Now
@@ -225,9 +225,9 @@ export default function App() {
               {freeGroupFriends.length > 0 ? (
                 <div className="space-y-3">
                   {freeGroupFriends.map((f) => (
-                    <div key={f.profile.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs shadow-sm gap-2">
-                      <div className="overflow-hidden">
-                        <span className="font-bold text-sm block truncate">{f.profile.fullName}</span>
+                    <div key={f.profile.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs shadow-sm">
+                      <div>
+                        <span className="font-bold text-sm block">{f.profile.fullName}</span>
                         <span className="text-[11px] opacity-60">
                           {f.profile.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
                         </span>
@@ -236,20 +236,20 @@ export default function App() {
                       {f.profile.phone ? (
                         <a
                           href={`tel:${f.profile.phone}`}
-                          className="btn btn-success btn-xs gap-1 text-white shadow shrink-0"
+                          className="btn btn-success btn-xs gap-1 text-white shadow"
                           title="Call Friend"
                         >
                           <Phone className="w-3 h-3" /> Call
                         </a>
                       ) : (
-                        <span className="text-[10px] opacity-40 italic shrink-0">No phone</span>
+                        <span className="text-[10px] opacity-40 italic">No phone</span>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6 space-y-2">
-                  <Clock className="w-7 h-7 opacity-30 mx-auto" />
+                <div className="text-center py-8 space-y-2">
+                  <Clock className="w-8 h-8 opacity-30 mx-auto" />
                   <p className="text-xs opacity-60 italic">
                     No group members are currently free right now, or you haven't joined any group yet.
                   </p>
