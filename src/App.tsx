@@ -71,10 +71,10 @@ export default function App() {
   }, []);
 
   const handleRoutineParsed = async (newSlots: CourseSlot[]) => {
-    const updated = [...routineSlots, ...newSlots];
-    setRoutineSlots(updated);
+    // Fixed: Overwrite previous slots completely instead of appending/duplicating
+    setRoutineSlots(newSlots);
     if (user) {
-      await saveUserRoutine(user.id, updated);
+      await saveUserRoutine(user.id, newSlots);
     }
   };
 
