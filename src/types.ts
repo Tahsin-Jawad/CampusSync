@@ -12,6 +12,7 @@ export interface UserProfile {
   id: string;
   fullName: string;
   email: string;
+  phone?: string; // ফোন নম্বর ফিল্ড
   isPublic: boolean;
   campusStatus: 'ON_CAMPUS' | 'OFF_CAMPUS';
 }

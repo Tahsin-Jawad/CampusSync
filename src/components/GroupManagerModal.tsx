@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Clock, UserCheck, Copy, Check, UserX } from 'lucide-react';
+import { Users, Plus, Clock, UserCheck, Copy, Check, UserX, Trash2 } from 'lucide-react';
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
 import { createGroup, getUserGroups, joinGroup, calculateLiveStatus, removeGroupMember } from '../services/groupService';
 import { getAllFriendsRoutines } from '../services/userService';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 interface GroupManagerModalProps {
   isOpen: boolean;
@@ -71,11 +73,24 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
     }
   };
 
+  // Super Admin delete any user from the platform
+  const handleDeleteUserCompletely = async (userId: string, userName: string) => {
+    if (window.confirm(`[ADMIN] Are you sure you want to completely delete user "${userName}" from CampusSync?`)) {
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+        await loadData();
+        alert('User deleted successfully.');
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user.');
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   const currentGroup = groups.find((g) => g.id === selectedGroupId);
 
-  // Permission Logic: Super Admin or Group Creator can manage members
   const ADMIN_EMAIL = 'jawadtahsinal@gmail.com';
   const isAdmin = currentUser.email === ADMIN_EMAIL;
   const isCreator = currentGroup?.createdById === currentUser.id;
@@ -102,11 +117,30 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
       <div className="modal-box bg-base-100 max-w-3xl border border-base-300">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-xl flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" /> Friend Circles & Live Availability
+            <Users className="w-6 h-6 text-primary" /> Friend Circles & Availability
           </h3>
           <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">✕</button>
         </div>
 
+        {/* Available On Campus Right Now */}
+        <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl mb-6">
+          <h4 className="font-bold text-sm text-primary flex items-center gap-1.5 mb-2">
+            <UserCheck className="w-4 h-4" /> Available On Campus Right Now ({campusFreeFriends.length})
+          </h4>
+          {campusFreeFriends.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {campusFreeFriends.map((st) => (
+                <span key={st.user.id} className="badge badge-success gap-1 text-xs py-2 px-3 font-medium">
+                  🟢 {st.user.fullName} (Free)
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs opacity-70">No friends are currently free on campus right now.</p>
+          )}
+        </div>
+
+        {/* Group Selector & Manager */}
         <div className="bg-base-200 p-4 rounded-xl border border-base-300 mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="w-full sm:w-1/2">
@@ -174,26 +208,10 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           </div>
         </div>
 
-        <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl mb-6">
-          <h4 className="font-bold text-sm text-primary flex items-center gap-1.5 mb-2">
-            <UserCheck className="w-4 h-4" /> Available On Campus Right Now ({campusFreeFriends.length})
-          </h4>
-          {campusFreeFriends.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {campusFreeFriends.map((st) => (
-                <span key={st.user.id} className="badge badge-success gap-1 text-xs py-2 px-3 font-medium">
-                  🟢 {st.user.fullName} (Free)
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs opacity-70">No friends are currently free on campus right now.</p>
-          )}
-        </div>
-
+        {/* Member Status List */}
         <div className="space-y-3">
           <h4 className="font-bold text-sm flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-secondary" /> Live Member Status ({liveStatuses.length})
+            <Clock className="w-4 h-4 text-secondary" /> {selectedGroupId === 'ALL' ? 'All Registered Users' : 'Group Members'} ({liveStatuses.length})
           </h4>
 
           {loading ? (
@@ -201,14 +219,17 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
               <span className="loading loading-spinner text-primary"></span>
             </div>
           ) : liveStatuses.length === 0 ? (
-            <p className="text-xs opacity-60 italic text-center py-4">No members in this group yet.</p>
+            <p className="text-xs opacity-60 italic text-center py-4">No members found.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
               {liveStatuses.map((st) => (
                 <div key={st.user.id} className="bg-base-200 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs">
                   <div>
                     <span className="font-bold text-sm block">{st.user.fullName}</span>
-                    <span className="opacity-60">{st.user.email}</span>
+                    <span className="opacity-60 block">{st.user.email}</span>
+                    {st.user.phone && (
+                      <span className="font-mono text-[11px] text-primary block mt-0.5">📞 {st.user.phone}</span>
+                    )}
                     <div className="mt-1 flex items-center gap-1.5">
                       <span className={`badge badge-xs ${st.user.campusStatus === 'ON_CAMPUS' ? 'badge-success' : 'badge-ghost'}`}>
                         {st.user.campusStatus === 'ON_CAMPUS' ? 'On Campus' : 'Off Campus'}
@@ -221,27 +242,26 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="text-right opacity-80">
-                      {st.nextClass ? (
-                        <div>
-                          <span className="text-[10px] block opacity-60">Next Class:</span>
-                          <span className="font-semibold text-primary">{st.nextClass.courseCode}</span>
-                          <span className="block text-[10px]">{st.nextClass.startTime}</span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] opacity-60">No more classes today</span>
-                      )}
-                    </div>
-
-                    {/* Delete button logic: Admin, Creator, or Leaving self */}
+                  <div className="flex flex-col items-end gap-2">
+                    {/* 1. Remove from Group Button (When a specific group is selected) */}
                     {selectedGroupId !== 'ALL' && (canManageMembers || st.user.id === currentUser.id) && (
                       <button
                         onClick={() => handleRemoveMember(st.user.id)}
-                        className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+                        className="btn btn-ghost btn-xs text-error hover:bg-error/10 gap-1"
                         title={st.user.id === currentUser.id ? "Leave Group" : "Remove Member"}
                       >
-                        <UserX className="w-4 h-4" />
+                        <UserX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {/* 2. Admin Complete Delete Button (When ALL registered is selected & Admin is logged in) */}
+                    {selectedGroupId === 'ALL' && isAdmin && st.user.id !== currentUser.id && (
+                      <button
+                        onClick={() => handleDeleteUserCompletely(st.user.id, st.user.fullName)}
+                        className="btn btn-ghost btn-xs text-error hover:bg-error/10 gap-1"
+                        title="Delete User Completely (Admin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
                       </button>
                     )}
                   </div>
