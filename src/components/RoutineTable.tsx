@@ -15,7 +15,7 @@ export const RoutineTable: React.FC<RoutineTableProps> = ({ slots, onEditSlot, o
     return (
       <div className="text-center py-12 bg-base-200/50 rounded-2xl border border-dashed border-base-300">
         <p className="text-base font-medium opacity-70">No classes found in your schedule yet.</p>
-        <p className="text-xs opacity-50 mt-1">Upload an Excel file or add slots manually above.</p>
+        <p className="text-xs opacity-50 mt-1">Add slots manually above to build your schedule.</p>
       </div>
     );
   }

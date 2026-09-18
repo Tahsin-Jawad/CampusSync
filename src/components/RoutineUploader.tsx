@@ -1,122 +1,81 @@
 import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, PlusCircle } from 'lucide-react';
-import type { CourseSlot } from '../types/routine';
-import { parseTimeAndDays } from '../utils/routineParser';
+import { Upload, Plus, FileText, FileSpreadsheet } from 'lucide-react';
+import { parseRoutineText } from '../utils/routineParser';
+import type { CourseSlot } from '../types';
 
 interface RoutineUploaderProps {
   onRoutineParsed: (slots: CourseSlot[]) => void;
-  onOpenManualForm?: () => void;
+  onOpenManualForm: () => void;
 }
 
 export const RoutineUploader: React.FC<RoutineUploaderProps> = ({ onRoutineParsed, onOpenManualForm }) => {
-  const [loading, setLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [rawText, setRawText] = useState('');
+
+  const handleTextParse = () => {
+    if (!rawText.trim()) return;
+    const parsedSlots = parseRoutineText(rawText);
+    onRoutineParsed(parsedSlots);
+    setRawText('');
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-        const slots: CourseSlot[] = [];
-        let lastCourseCode = '';
-
-        for (let i = 0; i < rawRows.length; i++) {
-          const row = rawRows[i];
-          if (!row || row.length === 0) continue;
-
-          const strRow = row.map((cell) => (cell !== undefined && cell !== null ? String(cell).trim() : ''));
-
-          strRow.forEach((cell, colIndex) => {
-            const parsedTime = parseTimeAndDays(cell);
-            if (parsedTime) {
-              const potentialCode = strRow.find((val) => /^[A-Z]{2,4}\d{3,4}/i.test(val)) || lastCourseCode || 'COURSE';
-              if (/^[A-Z]{2,4}\d{3,4}/i.test(potentialCode)) {
-                lastCourseCode = potentialCode;
-              }
-
-              const room = strRow[colIndex + 1] || strRow[colIndex - 1] || 'TBA';
-
-              parsedTime.days.forEach((day, dIdx) => {
-                slots.push({
-                  id: `slot-${i}-${colIndex}-${dIdx}-${Date.now()}`,
-                  courseCode: potentialCode,
-                  courseTitle: potentialCode,
-                  instructor: 'TBA',
-                  room,
-                  day,
-                  startTime: parsedTime.startTime,
-                  endTime: parsedTime.endTime,
-                });
-              });
-            }
-          });
-        }
-
-        if (slots.length === 0) {
-          throw new Error('No valid class slots found. Try adding manually.');
-        }
-
-        onRoutineParsed(slots);
-        setSuccessMsg(`Successfully parsed ${slots.length} class slots!`);
-      } catch (err: any) {
-        setErrorMsg(err.message || 'Could not parse routine file.');
-      } finally {
-        setLoading(false);
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const parsedSlots = parseRoutineText(content);
+        onRoutineParsed(parsedSlots);
       }
     };
-
-    reader.readAsBinaryString(file);
+    reader.readAsText(file);
   };
 
   return (
-    <div className="card bg-base-200 border border-base-300 p-6 rounded-2xl shadow-sm space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <FileSpreadsheet className="w-6 h-6 text-primary" />
-          <h2 className="text-xl font-bold">Upload Schedule (Excel/CSV)</h2>
+    <div className="bg-base-200 p-6 rounded-2xl border border-base-300 space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Upload className="w-5 h-5 text-primary" /> Import Routine
+          </h2>
+          <p className="text-xs opacity-70 mt-1">
+            Upload an Excel/CSV routine file, paste raw text, or add slots manually.
+          </p>
         </div>
-        {onOpenManualForm && (
-          <button onClick={onOpenManualForm} className="btn btn-sm btn-outline gap-1 rounded-lg">
-            <PlusCircle className="w-4 h-4" /> Add Manually
-          </button>
-        )}
+        <button onClick={onOpenManualForm} className="btn btn-primary btn-sm gap-2 rounded-lg">
+          <Plus className="w-4 h-4" /> Add Slot Manually
+        </button>
       </div>
 
-      {errorMsg && (
-        <div className="alert alert-error text-sm py-2 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          <span>{errorMsg}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="border-2 border-dashed border-base-300 hover:border-primary/50 p-4 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer relative bg-base-100/50 transition-colors">
+          <input
+            type="file"
+            accept=".csv, .txt, .xlsx, .xls"
+            onChange={handleFileUpload}
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+          />
+          <FileSpreadsheet className="w-8 h-8 text-primary mb-2 opacity-80" />
+          <p className="text-xs font-semibold">Click to upload Excel / CSV routine</p>
+          <p className="text-[10px] opacity-60 mt-1">Supports .csv, .txt, .xlsx files</p>
         </div>
-      )}
 
-      {successMsg && (
-        <div className="alert alert-success text-sm py-2 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          <span>{successMsg}</span>
+        <div className="space-y-2">
+          <textarea
+            className="textarea textarea-bordered w-full text-xs font-mono h-24"
+            placeholder="Or paste routine text here (e.g. CSE345 Sunday 03:10 PM - 04:40 PM)..."
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+          />
+          <div className="flex justify-end">
+            <button onClick={handleTextParse} className="btn btn-secondary btn-sm gap-2 rounded-lg">
+              <FileText className="w-4 h-4" /> Parse Text
+            </button>
+          </div>
         </div>
-      )}
-
-      <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-base-300 rounded-xl cursor-pointer hover:border-primary transition-colors bg-base-100">
-        <div className="flex flex-col items-center justify-center">
-          <Upload className="w-6 h-6 mb-1 text-primary opacity-80" />
-          <p className="text-sm font-semibold">Upload Advising Slip or Routine Excel</p>
-          <p className="text-xs opacity-60 mt-0.5">Supports EWU Advising Slip & standard XLSX/CSV</p>
-        </div>
-        <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} disabled={loading} />
-      </label>
+      </div>
     </div>
   );
 };

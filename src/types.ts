@@ -2,9 +2,10 @@ export interface CourseSlot {
   id: string;
   courseCode: string;
   courseTitle?: string;
+  room?: string;
   day: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
-  startTime: string; // e.g. "08:30 AM"
-  endTime: string;   // e.g. "10:00 AM"
+  startTime: string;
+  endTime: string;
 }
 
 export interface UserProfile {
@@ -19,7 +20,7 @@ export interface Group {
   id: string;
   name: string;
   createdById: string;
-  members: string[]; // List of User IDs
+  members: string[];
 }
 
 export interface FriendLiveStatus {
