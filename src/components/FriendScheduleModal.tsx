@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, Calendar, RefreshCw } from 'lucide-react';
+import { Users, Clock, Calendar } from 'lucide-react';
 import type { CourseSlot } from '../types';
 import { findCommonFreeTime } from '../utils/routineMatcher';
 import { getAllFriendsRoutines, type FriendWithRoutine } from '../services/userService';

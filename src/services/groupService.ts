@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
 

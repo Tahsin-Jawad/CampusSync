@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Clock, ShieldCheck, UserCheck, UserX, Copy, Check } from 'lucide-react';
+import { Users, Plus, Clock, UserCheck, Copy, Check } from 'lucide-react';
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
 import { createGroup, getUserGroups, joinGroup, calculateLiveStatus } from '../services/groupService';
 import { getAllFriendsRoutines } from '../services/userService';
-import { findCommonFreeTime } from '../utils/routineMatcher';
 
 interface GroupManagerModalProps {
   isOpen: boolean;
@@ -14,7 +13,7 @@ interface GroupManagerModalProps {
 
 const DAYS: CourseSlot['day'][] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose, currentUser, userSlots }) => {
+export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose, currentUser }) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('ALL');
   const [newGroupName, setNewGroupName] = useState('');
@@ -22,7 +21,6 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
   const [friendsData, setFriendsData] = useState<{ profile: UserProfile; slots: CourseSlot[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<CourseSlot['day']>('Sunday');
 
   const now = new Date();
   const dayName = DAYS[now.getDay()];
@@ -91,7 +89,6 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">✕</button>
         </div>
 
-        {/* Group Selector & Creation */}
         <div className="bg-base-200 p-4 rounded-xl border border-base-300 mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="w-full sm:w-1/2">
@@ -134,7 +131,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
             <form onSubmit={handleCreateGroup} className="flex gap-2">
               <input
                 type="text"
-                placeholder="New Group Name (e.g. Reels-ation)"
+                placeholder="New Group Name"
                 className="input input-bordered input-sm w-full text-xs"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
@@ -159,7 +156,6 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           </div>
         </div>
 
-        {/* Live Availability Highlights */}
         <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl mb-6">
           <h4 className="font-bold text-sm text-primary flex items-center gap-1.5 mb-2">
             <UserCheck className="w-4 h-4" /> Available On Campus Right Now ({campusFreeFriends.length})
@@ -177,7 +173,6 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           )}
         </div>
 
-        {/* Live Friend Status Cards */}
         <div className="space-y-3">
           <h4 className="font-bold text-sm flex items-center gap-1.5">
             <Clock className="w-4 h-4 text-secondary" /> Live Member Status ({liveStatuses.length})
