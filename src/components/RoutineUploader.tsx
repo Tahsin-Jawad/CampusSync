@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, Plus, FileText, FileSpreadsheet } from 'lucide-react';
-import { parseRoutineText } from '../utils/routineParser';
+import { parseRoutineText, parseExcelRoutine } from '../utils/routineParser';
 import type { CourseSlot } from '../types';
 
 interface RoutineUploaderProps {
@@ -24,13 +24,13 @@ export const RoutineUploader: React.FC<RoutineUploaderProps> = ({ onRoutineParse
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const parsedSlots = parseRoutineText(content);
+      const buffer = event.target?.result as ArrayBuffer;
+      if (buffer) {
+        const parsedSlots = parseExcelRoutine(buffer);
         onRoutineParsed(parsedSlots);
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -41,7 +41,7 @@ export const RoutineUploader: React.FC<RoutineUploaderProps> = ({ onRoutineParse
             <Upload className="w-5 h-5 text-primary" /> Import Routine
           </h2>
           <p className="text-xs opacity-70 mt-1">
-            Upload an Excel/CSV routine file, paste raw text, or add slots manually.
+            Upload an Excel/CSV routine file or paste text.
           </p>
         </div>
         <button onClick={onOpenManualForm} className="btn btn-primary btn-sm gap-2 rounded-lg">
@@ -53,19 +53,19 @@ export const RoutineUploader: React.FC<RoutineUploaderProps> = ({ onRoutineParse
         <div className="border-2 border-dashed border-base-300 hover:border-primary/50 p-4 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer relative bg-base-100/50 transition-colors">
           <input
             type="file"
-            accept=".csv, .txt, .xlsx, .xls"
+            accept=".csv, .xlsx, .xls"
             onChange={handleFileUpload}
             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
           />
           <FileSpreadsheet className="w-8 h-8 text-primary mb-2 opacity-80" />
           <p className="text-xs font-semibold">Click to upload Excel / CSV routine</p>
-          <p className="text-[10px] opacity-60 mt-1">Supports .csv, .txt, .xlsx files</p>
+          <p className="text-[10px] opacity-60 mt-1">Supports .xlsx, .xls, .csv files</p>
         </div>
 
         <div className="space-y-2">
           <textarea
             className="textarea textarea-bordered w-full text-xs font-mono h-24"
-            placeholder="Or paste routine text here (e.g. CSE345 Sunday 03:10 PM - 04:40 PM)..."
+            placeholder="Or paste routine text here..."
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
           />
