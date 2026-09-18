@@ -1,61 +1,82 @@
 import React from 'react';
-import { Pencil, Trash2, Clock } from 'lucide-react';
+import { Pencil, Trash2, Calendar } from 'lucide-react';
 import type { CourseSlot } from '../types';
 
 interface RoutineTableProps {
   slots: CourseSlot[];
   onEditSlot: (slot: CourseSlot) => void;
-  onDeleteSlot: (id: string) => void;
+  onDeleteSlot: (slotId: string) => void;
 }
 
 const DAYS: CourseSlot['day'][] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const RoutineTable: React.FC<RoutineTableProps> = ({ slots, onEditSlot, onDeleteSlot }) => {
-  if (!slots || slots.length === 0) {
+  // Confirmation before delete
+  const handleDeleteClick = (slotId: string, courseCode: string) => {
+    if (window.confirm(`Are you sure you want to delete "${courseCode}" from your routine?`)) {
+      onDeleteSlot(slotId);
+    }
+  };
+
+  const slotsByDay = DAYS.reduce((acc, day) => {
+    acc[day] = slots.filter((s) => s.day === day);
+    return acc;
+  }, {} as Record<CourseSlot['day'], CourseSlot[]>);
+
+  if (slots.length === 0) {
     return (
-      <div className="text-center py-12 bg-base-200/50 rounded-2xl border border-dashed border-base-300">
-        <p className="text-base font-medium opacity-70">No classes found in your schedule yet.</p>
-        <p className="text-xs opacity-50 mt-1">Add slots manually above to build your schedule.</p>
+      <div className="bg-base-200 p-8 rounded-2xl border border-base-300 text-center space-y-3">
+        <Calendar className="w-10 h-10 opacity-30 mx-auto text-primary" />
+        <h3 className="font-bold text-base">No Routine Added Yet</h3>
+        <p className="text-xs opacity-60 max-w-sm mx-auto">
+          Upload your EWU Advising Slip (Excel format) using the uploader above or add courses manually to build your weekly schedule.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Your Class Schedule</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <h3 className="font-black text-lg flex items-center gap-2">
+        <Calendar className="w-5 h-5 text-primary" /> Your Class Schedule
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {DAYS.map((day) => {
-          const daySlots = slots.filter((s) => s.day === day);
+          const daySlots = slotsByDay[day];
           if (daySlots.length === 0) return null;
 
           return (
-            <div key={day} className="card bg-base-200 border border-base-300 shadow-sm overflow-hidden">
-              <div className="bg-primary/10 px-4 py-2 border-b border-base-300 flex justify-between items-center">
-                <span className="font-bold text-primary">{day}</span>
-                <span className="badge badge-sm badge-neutral">{daySlots.length} classes</span>
+            <div key={day} className="bg-base-200 p-4 rounded-2xl border border-base-300 space-y-3 shadow-sm">
+              <div className="flex justify-between items-center border-b border-base-300 pb-2">
+                <span className="font-bold text-sm text-primary">{day}</span>
+                <span className="badge badge-sm badge-ghost font-medium text-[11px]">{daySlots.length} classes</span>
               </div>
-              <div className="p-3 space-y-2">
+
+              <div className="space-y-2.5">
                 {daySlots.map((slot) => (
-                  <div key={slot.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center">
-                    <div className="space-y-1">
-                      <span className="font-bold text-base text-primary block">{slot.courseCode}</span>
-                      <p className="text-xs font-medium opacity-75 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-secondary" /> {slot.startTime} - {slot.endTime}
-                      </p>
+                  <div key={slot.id} className="bg-base-100 p-3 rounded-xl border border-base-300 shadow-xs flex justify-between items-start gap-2">
+                    <div className="space-y-1 overflow-hidden">
+                      <span className="font-bold text-sm block tracking-wide text-base-content truncate">{slot.courseCode}</span>
+                      <span className="text-xs opacity-75 block truncate">{slot.courseTitle}</span>
+                      <div className="flex items-center gap-1.5 text-[11px] opacity-60 font-mono">
+                        <span>⏰ {slot.startTime} - {slot.endTime}</span>
+                        {slot.room && <span>• 📍 {slot.room}</span>}
+                      </div>
                     </div>
 
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => onEditSlot(slot)}
                         className="btn btn-ghost btn-xs btn-square text-info hover:bg-info/10"
-                        title="Edit slot"
+                        title="Edit Course"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => onDeleteSlot(slot.id)}
+                        onClick={() => handleDeleteClick(slot.id, slot.courseCode)}
                         className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
-                        title="Delete slot"
+                        title="Delete Course"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
