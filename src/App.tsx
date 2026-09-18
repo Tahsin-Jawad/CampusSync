@@ -31,26 +31,39 @@ export default function App() {
   const [phoneInput, setPhoneInput] = useState('');
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
 
+  const campusActive = isWithinCampusHours();
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userDocRef);
+        
+        let profile: UserProfile;
+        const currentCampusActive = isWithinCampusHours();
+
         if (userSnap.exists()) {
-          const profile = userSnap.data() as UserProfile;
+          profile = userSnap.data() as UserProfile;
+          
+          if (!currentCampusActive && profile.campusStatus === 'ON_CAMPUS') {
+            profile.campusStatus = 'OFF_CAMPUS';
+            await updateDoc(userDocRef, { campusStatus: 'OFF_CAMPUS' });
+          }
+
           setUser(profile);
           setPhoneInput(profile.phone || '');
         } else {
-          const newProfile: UserProfile = {
+          const initialStatus = currentCampusActive ? 'ON_CAMPUS' : 'OFF_CAMPUS';
+          profile = {
             id: firebaseUser.uid,
             fullName: firebaseUser.displayName || 'EWU Student',
             email: firebaseUser.email || '',
-            campusStatus: 'ON_CAMPUS',
+            campusStatus: initialStatus,
             isPublic: true,
-            isAdmin: firebaseUser.email === 'jawad@gmail.com'
+            isAdmin: firebaseUser.email === 'jawadtahsinal@gmail.com'
           };
-          await setDoc(userDocRef, newProfile);
-          setUser(newProfile);
+          await setDoc(userDocRef, profile);
+          setUser(profile);
         }
 
         const slots = await getUserRoutine(firebaseUser.uid);
@@ -122,7 +135,6 @@ export default function App() {
   const now = new Date();
   const dayName = DAYS[now.getDay()];
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const campusActive = isWithinCampusHours();
 
   const userGroupMemberIds = new Set<string>();
   userGroups.forEach((g) => g.members.forEach((m) => userGroupMemberIds.add(m)));
@@ -131,12 +143,12 @@ export default function App() {
     if (user && f.profile.id === user.id) return false;
     
     if (!campusActive) return false;
+    if (f.profile.campusStatus !== 'ON_CAMPUS') return false;
 
     const isInMyGroup = userGroupMemberIds.size === 0 || userGroupMemberIds.has(f.profile.id);
     if (!isInMyGroup) return false;
 
     const todaySlots = f.slots.filter((s) => s.day === dayName);
-    
     if (todaySlots.length === 0) return false;
 
     const parseToMins = (tStr: string) => {
