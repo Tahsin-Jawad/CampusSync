@@ -12,9 +12,10 @@ export interface UserProfile {
   id: string;
   fullName: string;
   email: string;
-  phone?: string; 
+  phone?: string;
   isPublic: boolean;
   campusStatus: 'ON_CAMPUS' | 'OFF_CAMPUS' | string;
+}
 
 export interface Group {
   id: string;
