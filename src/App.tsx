@@ -102,7 +102,7 @@ export default function App() {
   const handleStatusToggle = async () => {
     if (!user) return;
     const newStatus: 'ON_CAMPUS' | 'OFF_CAMPUS' = user.campusStatus === 'ON_CAMPUS' ? 'OFF_CAMPUS' : 'ON_CAMPUS';
-    const updated = { ...user, campusStatus: newStatus };
+    const updated: UserProfile = { ...user, campusStatus: newStatus };
     setUser(updated);
     await updateUserStatus(user.id, newStatus);
   };
