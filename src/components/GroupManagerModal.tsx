@@ -3,7 +3,7 @@ import { Users, Plus, Clock, UserCheck, Copy, Check, UserX, Trash2 } from 'lucid
 import type { UserProfile, CourseSlot, Group, FriendLiveStatus } from '../types';
 import { createGroup, getUserGroups, joinGroup, calculateLiveStatus, removeGroupMember } from '../services/groupService';
 import { getAllFriendsRoutines } from '../services/userService';
-import { isWithinCampusHours } from '../utils/routineMatcher';
+import { isWithinCampusHours, isUserOnCampusAuto } from '../utils/routineMatcher';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
@@ -16,7 +16,7 @@ interface GroupManagerModalProps {
 
 const DAYS: CourseSlot['day'][] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose, currentUser }) => {
+export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose, currentUser, userSlots }) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('ALL');
   const [newGroupName, setNewGroupName] = useState('');
@@ -32,6 +32,21 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
 
   const ADMIN_EMAIL = 'jawadtahsinal@gmail.com';
   const isAdmin = currentUser.email === ADMIN_EMAIL;
+
+  const getEffectiveCampusStatus = (profile: UserProfile, slots: CourseSlot[]): 'ON_CAMPUS' | 'OFF_CAMPUS' => {
+    const hasClassRightNow = isUserOnCampusAuto(slots, dayName);
+    if (hasClassRightNow) {
+      return 'ON_CAMPUS';
+    }
+
+    const hasClassToday = slots.some((s) => s.day === dayName);
+
+    if (isWithinCampusHours() && hasClassToday && profile.campusStatus === 'ON_CAMPUS') {
+      return 'ON_CAMPUS';
+    }
+
+    return 'OFF_CAMPUS';
+  };
 
   useEffect(() => {
     if (isOpen && currentUser) {
@@ -125,34 +140,19 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
   });
 
   const liveStatuses: FriendLiveStatus[] = filteredFriends.map((f) => {
-    const status = calculateLiveStatus(f.profile, f.slots, dayName, currentMinutes);
-    
-    const todaySlots = f.slots.filter((s) => s.day === dayName);
-    if (todaySlots.length > 0) {
-      const parseToMins = (tStr: string) => {
-        const m = tStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-        if (!m) return 0;
-        let h = parseInt(m[1]); const min = parseInt(m[2]);
-        if (m[3].toUpperCase() === 'PM' && h < 12) h += 12;
-        if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-        return h * 60 + min;
-      };
-      const latestEnd = Math.max(...todaySlots.map(s => parseToMins(s.endTime)));
-      if (currentMinutes > latestEnd) {
-        status.isCurrentlyFree = false;
-      }
-    }
-
-    if (!campusActive) {
-      status.isCurrentlyFree = false;
-    }
-
-    return status;
+    const slots = f.profile.id === currentUser.id ? userSlots : f.slots;
+    return calculateLiveStatus(f.profile, slots, dayName, currentMinutes);
   });
 
-  const campusFreeFriends = liveStatuses.filter(
-    (s) => campusActive && s.user.campusStatus === 'ON_CAMPUS' && s.isCurrentlyFree
-  );
+  const campusFreeFriends = filteredFriends.filter((f) => {
+    if (!campusActive) return false;
+    const slots = f.profile.id === currentUser.id ? userSlots : f.slots;
+    const effectiveStatus = getEffectiveCampusStatus(f.profile, slots);
+    if (effectiveStatus !== 'ON_CAMPUS') return false;
+
+    const status = calculateLiveStatus(f.profile, slots, dayName, currentMinutes);
+    return status.isCurrentlyFree;
+  });
 
   return (
     <div className="modal modal-open">
@@ -170,9 +170,9 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           </h4>
           {campusActive && campusFreeFriends.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {campusFreeFriends.map((st) => (
-                <span key={st.user.id} className="badge badge-success gap-1 text-xs py-2 px-3 font-medium">
-                  🟢 {st.user.fullName} (Free)
+              {campusFreeFriends.map((f) => (
+                <span key={f.profile.id} className="badge badge-success gap-1 text-xs py-2 px-3 font-medium text-white">
+                  🟢 {f.profile.fullName} (Free)
                 </span>
               ))}
             </div>
@@ -278,6 +278,12 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
               {liveStatuses.map((st) => {
                 const canSeeDetails = isAdmin || currentUser.id === st.user.id || (currentGroup && currentGroup.members.includes(st.user.id));
+                
+                const friendSlots = st.user.id === currentUser.id 
+                  ? userSlots 
+                  : (friendsData.find((f) => f.profile.id === st.user.id)?.slots || []);
+
+                const effectiveCampusStatus = getEffectiveCampusStatus(st.user, friendSlots);
 
                 return (
                   <div key={st.user.id} className="bg-base-200 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs">
@@ -288,14 +294,14 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
                         <span className="font-mono text-[11px] text-primary block mt-0.5">📞 {st.user.phone}</span>
                       )}
                       <div className="mt-1 flex items-center gap-1.5">
-                        <span className={`badge badge-xs ${st.user.campusStatus === 'ON_CAMPUS' ? 'badge-success' : 'badge-ghost'}`}>
-                          {st.user.campusStatus === 'ON_CAMPUS' ? 'On Campus' : 'Off Campus'}
+                        <span className={`badge badge-xs ${effectiveCampusStatus === 'ON_CAMPUS' ? 'badge-success text-white' : 'badge-ghost'}`}>
+                          {effectiveCampusStatus === 'ON_CAMPUS' ? 'On Campus' : 'Off Campus'}
                         </span>
                         {campusActive && st.isCurrentlyFree ? (
                           <span className="badge badge-xs badge-info">Free Now</span>
                         ) : (
                           <span className="badge badge-xs badge-error">
-                            {!campusActive ? 'Off-Hours' : `In Class: ${st.currentClass?.courseCode || 'Busy'}`}
+                            {!campusActive ? 'Off-Hours' : st.currentClass ? `In Class: ${st.currentClass.courseCode}` : 'No Class / Off'}
                           </span>
                         )}
                       </div>

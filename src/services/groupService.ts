@@ -77,10 +77,16 @@ export const calculateLiveStatus = (
     }
   });
 
+  const hasClassesToday = todaySlots.length > 0;
+  const latestEnd = hasClassesToday ? Math.max(...todaySlots.map(s => parseToMinutes(s.endTime))) : 0;
+  const isAfterAllClasses = hasClassesToday && currentMinutes > latestEnd;
+
+  const isCurrentlyFree = hasClassesToday && !currentClass && !isAfterAllClasses;
+
   return {
     user,
     slots,
-    isCurrentlyFree: !currentClass,
+    isCurrentlyFree,
     currentClass,
     nextClass,
   };

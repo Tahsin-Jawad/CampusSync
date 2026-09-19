@@ -4,7 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getUserRoutine, saveUserRoutine } from './services/routineService';
 import { getAllFriendsRoutines, updateUserStatus } from './services/userService';
-import { getUserGroups } from './services/groupService';
+import { getUserGroups, calculateLiveStatus } from './services/groupService';
 import { RoutineUploader } from './components/RoutineUploader';
 import { RoutineTable } from './components/RoutineTable';
 import { AddCourseModal } from './components/AddCourseModal';
@@ -12,7 +12,7 @@ import { AuthModal } from './components/AuthModal';
 import { GroupManagerModal } from './components/GroupManagerModal';
 import { Footer } from './components/Footer';
 import { Navbar } from './components/Navbar';
-import { isWithinCampusHours } from './utils/routineMatcher';
+import { isWithinCampusHours, isUserOnCampusAuto } from './utils/routineMatcher';
 import type { UserProfile, CourseSlot, Group } from './types';
 import { Phone, Clock, ShieldAlert } from 'lucide-react';
 
@@ -139,39 +139,33 @@ export default function App() {
   const userGroupMemberIds = new Set<string>();
   userGroups.forEach((g) => g.members.forEach((m) => userGroupMemberIds.add(m)));
 
-  const freeGroupFriends = friendsData.filter((f) => {
-    if (user && f.profile.id === user.id) return false;
-    
-    if (!campusActive) return false;
-
-    const isInMyGroup = userGroupMemberIds.size === 0 || userGroupMemberIds.has(f.profile.id);
-    if (!isInMyGroup) return false;
-
-    const todaySlots = f.slots.filter((s) => s.day === dayName);
-    if (todaySlots.length === 0) return false;
-
-    const parseToMins = (tStr: string) => {
-      const m = tStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-      if (!m) return 0;
-      let h = parseInt(m[1]); const min = parseInt(m[2]);
-      if (m[3].toUpperCase() === 'PM' && h < 12) h += 12;
-      if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-      return h * 60 + min;
-    };
-
-    const latestClassEndMinutes = Math.max(...todaySlots.map(s => parseToMins(s.endTime)));
-    if (currentMinutes > latestClassEndMinutes) {
-      return false;
+  const getEffectiveCampusStatus = (profile: UserProfile, slots: CourseSlot[]): 'ON_CAMPUS' | 'OFF_CAMPUS' => {
+    const hasClassRightNow = isUserOnCampusAuto(slots, dayName);
+    if (hasClassRightNow) {
+      return 'ON_CAMPUS';
     }
 
-    let inClass = false;
-    todaySlots.forEach((s) => {
-      const start = parseToMins(s.startTime);
-      const end = parseToMins(s.endTime);
-      if (currentMinutes >= start && currentMinutes <= end) inClass = true;
-    });
+    const hasClassToday = slots.some((s) => s.day === dayName);
 
-    return !inClass;
+    if (isWithinCampusHours() && hasClassToday && profile.campusStatus === 'ON_CAMPUS') {
+      return 'ON_CAMPUS';
+    }
+
+    return 'OFF_CAMPUS';
+  };
+
+  const freeGroupFriends = friendsData.filter((f) => {
+    if (user && f.profile.id === user.id) return false;
+    if (!campusActive) return false;
+
+    const effectiveStatus = getEffectiveCampusStatus(f.profile, f.slots);
+    if (effectiveStatus !== 'ON_CAMPUS') return false;
+
+    const isInMyGroup = userGroupMemberIds.has(f.profile.id);
+    if (!isInMyGroup) return false;
+
+    const status = calculateLiveStatus(f.profile, f.slots, dayName, currentMinutes);
+    return status.isCurrentlyFree;
   });
 
   return (
@@ -191,9 +185,9 @@ export default function App() {
                 <span className="text-xs opacity-75">Status:</span>
                 <button 
                   onClick={handleStatusToggle}
-                  className={`badge gap-1 cursor-pointer font-semibold py-2 px-3 ${user.campusStatus === 'ON_CAMPUS' ? 'badge-success text-white' : 'badge-ghost'}`}
+                  className={`badge gap-1 cursor-pointer font-semibold py-2 px-3 ${getEffectiveCampusStatus(user, routineSlots) === 'ON_CAMPUS' ? 'badge-success text-white' : 'badge-ghost'}`}
                 >
-                  {user.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
+                  {getEffectiveCampusStatus(user, routineSlots) === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
                 </button>
                 {user.isAdmin && (
                   <span className="badge badge-error text-white font-bold gap-1 text-xs">
@@ -255,13 +249,14 @@ export default function App() {
                 <div className="space-y-3">
                   {freeGroupFriends.map((f) => {
                     const canSeePhone = user?.isAdmin || userGroupMemberIds.has(f.profile.id);
+                    const friendEffectiveStatus = getEffectiveCampusStatus(f.profile, f.slots);
 
                     return (
                       <div key={f.profile.id} className="bg-base-100 p-3 rounded-xl border border-base-300 flex justify-between items-center text-xs shadow-sm">
                         <div>
                           <span className="font-bold text-sm block">{f.profile.fullName}</span>
                           <span className="text-[11px] opacity-60">
-                            {f.profile.campusStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
+                            {friendEffectiveStatus === 'ON_CAMPUS' ? '🟢 On Campus' : '⚪ Off Campus'}
                           </span>
                         </div>
                         
