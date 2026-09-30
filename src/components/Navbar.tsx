@@ -5,7 +5,7 @@ import { auth } from '../services/firebase';
 import { signOut } from 'firebase/auth';
 
 interface NavbarProps {
-  user: UserProfile | null; // এখানে user প্রপসটি যোগ করা হয়েছে
+  user: UserProfile | null; 
   onOpenAuth: () => void;
   onOpenGroups: () => void;
 }
